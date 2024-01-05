@@ -85,3 +85,18 @@ result:
 /tmp/toodo
 /tmp/itsrat
 #+end_example
+
+** help
+
+#+begin_example
+Usage:
+  herfish [OPTIONS]
+
+Application Options:
+      --log-format=[text|json] Log format (default: text)
+  -v, --verbose                Show verbose debug information, each -v bumps log level
+  -s, --sentinel=              Sentinel folder to stop searching (default: .git)
+
+Help Options:
+  -h, --help                   Show this help message
+#+end_example
