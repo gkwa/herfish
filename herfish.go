@@ -64,7 +64,7 @@ func run() error {
 	sort.Strings(paths)
 
 	var resultBuffer bytes.Buffer
-	sentinelDirs := findSentinelDirs(paths)
+	sentinelDirs := findSentinelDirs(paths, opts.Sentinel)
 	for _, dir := range sentinelDirs {
 		resultBuffer.WriteString(dir)
 		resultBuffer.WriteString("\n")
@@ -75,7 +75,7 @@ func run() error {
 	return nil
 }
 
-func findSentinelDirs(paths []string) []string {
+func findSentinelDirs(paths []string, sentinelDir string) []string {
 	uniqueDirs := make(map[string]bool)
 	var result []string
 
@@ -83,7 +83,7 @@ func findSentinelDirs(paths []string) []string {
 		currentDir := filepath.Dir(path)
 
 		for currentDir != "/" && !uniqueDirs[currentDir] {
-			sentinelDir := filepath.Join(currentDir, opts.Sentinel)
+			sentinelDir := filepath.Join(currentDir, sentinelDir)
 			if _, err := os.Stat(sentinelDir); err == nil {
 				result = append(result, currentDir)
 				uniqueDirs[currentDir] = true
