@@ -47,6 +47,7 @@ func parseFlags() error {
 }
 
 func run() error {
+	fmt.Fprintln(os.Stderr, "Waiting for stdin...")
 	scanner := bufio.NewScanner(os.Stdin)
 	var paths []string
 
