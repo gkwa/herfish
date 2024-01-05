@@ -77,13 +77,13 @@ cat $tmp/flist | herfish
 
 result:
 #+begin_example
-/tmp/herfish
-/tmp/muchfight
 /tmp/bloomtail
 /tmp/halfport
+/tmp/herfish
+/tmp/itsrat
+/tmp/muchfight
 /tmp/sparseport
 /tmp/toodo
-/tmp/itsrat
 #+end_example
 
 ** help
