@@ -1,0 +1,14 @@
+* herfish
+
+** summary
+
+This is a description of project herfish.
+
+** usage
+
+Example:
+#+begin_example
+make test
+./herfish --help
+./herfish --verbose --verbose # for debug
+#+end_example
