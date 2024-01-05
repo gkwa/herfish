@@ -7,8 +7,10 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/jessevdk/go-flags"
+	// Import sort package for sorting paths
 )
 
 var opts struct {
@@ -56,6 +58,9 @@ func run() error {
 		fmt.Fprintln(os.Stderr, "Error reading input:", err)
 		os.Exit(1)
 	}
+
+	// Sort the list of paths
+	sort.Strings(paths)
 
 	var resultBuffer bytes.Buffer
 	sentinelDirs := findSentinelDirs(paths)
