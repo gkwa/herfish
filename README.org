@@ -1,14 +1,89 @@
 * herfish
+** gpt
+
+Write an app that will recieve a list of 0 or more paths similar to this:
+#+begin_example
+#+begin_example
+/tmp/toodo/toodo.go
+/tmp/toodo/mdfind/cond_date.go
+/tmp/toodo/mdfind/mdfind.go
+/tmp/toodo/mdfind/common.go
+/tmp/toodo/mdfind/cond_dir.go
+/tmp/toodo/mdfind/cond_extension.go
+/tmp/toodo/mdfind/mdfind_test.go
+/tmp/sparseport/sparseport.go
+/tmp/muchfight/muchfight.go
+#+end_example
+
+and you sould create a slice of these
+loop over the slice and starting from the file, search up the directory stact until you find a .git dir
+when you find the .git dir, then report the directory in which teh .git dir lies similar to this 
+you should output the list without duplicates
+
+so for example in this case, the result would be:
+#+begin_example
+/tmp/toodo
+/tmp/sparseport
+/tmp/muchfight
+#+end_example
+
+because the .git dir is here for each:
+#+begin_example
+/tmp/toodo/.git
+/tmp/sparseport/.git
+/tmp/muchfight/.git
+#+end_example
 
 ** summary
 
-This is a description of project herfish.
+Given some absolute file path, show me project names.
+
+I assume .git dir is in project root.
 
 ** usage
 
-Example:
+#+BEGIN_SRC sh :results output replace
+tmp=$(mktemp -d /tmp/mytest.XXXXX)
+cat >$tmp/flist <<EOF
+/tmp/herfish/herfish.go
+/tmp/herfish/logger.go
+/tmp/herfish/cmd/main.go
+/tmp/muchfight/muchfight.go
+/tmp/bloomtail/bloomtail.go
+/tmp/halfport/logger.go
+/tmp/halfport/cmd/main.go
+/tmp/halfport/halfport.go
+/tmp/sparseport/sparseport.go
+/tmp/sparseport/logger.go
+/tmp/sparseport/cmd/main.go
+/tmp/muchfight/logger.go
+/tmp/muchfight/cmd/main.go
+/tmp/itsrat/logger.go
+/tmp/itsrat/cmd/main.go
+/tmp/bloomtail/logger.go
+/tmp/bloomtail/cmd/main.go
+/tmp/toodo/mdfind/common.go
+/tmp/toodo/mdfind/cond_date.go
+/tmp/toodo/mdfind/cond_dir.go
+/tmp/toodo/mdfind/cond_extension.go
+/tmp/toodo/mdfind/mdfind.go
+/tmp/toodo/mdfind/mdfind_test.go
+/tmp/toodo/toodo.go
+/tmp/itsrat/itsrat.go
+EOF
+#+END_SRC
+
 #+begin_example
-make test
-./herfish --help
-./herfish --verbose --verbose # for debug
+cat $tmp/flist | herfish
+#+end_example
+
+result:
+#+begin_example
+/tmp/herfish
+/tmp/muchfight
+/tmp/bloomtail
+/tmp/halfport
+/tmp/sparseport
+/tmp/toodo
+/tmp/itsrat
 #+end_example

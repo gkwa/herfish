@@ -1,7 +1,11 @@
 package herfish
 
 import (
+	"bufio"
+	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 
 	"github.com/jessevdk/go-flags"
 )
@@ -10,6 +14,7 @@ var opts struct {
 	LogFormat string `long:"log-format" choice:"text" choice:"json" default:"text" description:"Log format"`
 	Verbose   []bool `short:"v" long:"verbose" description:"Show verbose debug information, each -v bumps log level"`
 	logLevel  slog.Level
+	Sentinel  string `short:"s" long:"sentinel" default:".git" description:"Sentinel folder to stop searching"`
 }
 
 func Execute() int {
@@ -39,10 +44,44 @@ func parseFlags() error {
 }
 
 func run() error {
-	slog.Debug("Debug", "currrent level", opts.logLevel)
-	slog.Info("Info", "currrent level", opts.logLevel)
-	slog.Warn("Warn", "currrent level", opts.logLevel)
-	slog.Error("Error", "currrent level", opts.logLevel)
+	scanner := bufio.NewScanner(os.Stdin)
+	var paths []string
+
+	for scanner.Scan() {
+		paths = append(paths, scanner.Text())
+	}
+
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error reading input:", err)
+		os.Exit(1)
+	}
+
+	gitDirs := findGitDirs(paths)
+	for _, dir := range gitDirs {
+		fmt.Println(dir)
+	}
 
 	return nil
+}
+
+func findGitDirs(paths []string) []string {
+	uniqueDirs := make(map[string]bool)
+	var result []string
+
+	for _, path := range paths {
+		currentDir := filepath.Dir(path)
+
+		for currentDir != "/" && !uniqueDirs[currentDir] {
+			sentinelDir := filepath.Join(currentDir, opts.Sentinel)
+			if _, err := os.Stat(sentinelDir); err == nil {
+				result = append(result, currentDir)
+				uniqueDirs[currentDir] = true
+				break
+			}
+
+			currentDir = filepath.Dir(currentDir)
+		}
+	}
+
+	return result
 }
