@@ -56,15 +56,15 @@ func run() error {
 		os.Exit(1)
 	}
 
-	gitDirs := findGitDirs(paths)
-	for _, dir := range gitDirs {
+	sentinelDirs := findSentinelDirs(paths)
+	for _, dir := range sentinelDirs {
 		fmt.Println(dir)
 	}
 
 	return nil
 }
 
-func findGitDirs(paths []string) []string {
+func findSentinelDirs(paths []string) []string {
 	uniqueDirs := make(map[string]bool)
 	var result []string
 
