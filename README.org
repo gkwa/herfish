@@ -71,11 +71,9 @@ cat >$tmp/flist <<EOF
 /tmp/toodo/toodo.go
 /tmp/itsrat/itsrat.go
 EOF
-#+END_SRC
 
-#+begin_example
 cat $tmp/flist | herfish
-#+end_example
+#+END_SRC
 
 result:
 #+begin_example
