@@ -2,6 +2,7 @@ package herfish
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"log/slog"
 	"os"
@@ -56,10 +57,14 @@ func run() error {
 		os.Exit(1)
 	}
 
+	var resultBuffer bytes.Buffer
 	sentinelDirs := findSentinelDirs(paths)
 	for _, dir := range sentinelDirs {
-		fmt.Println(dir)
+		resultBuffer.WriteString(dir)
+		resultBuffer.WriteString("\n")
 	}
+
+	fmt.Print(resultBuffer.String())
 
 	return nil
 }
