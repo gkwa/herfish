@@ -10,7 +10,6 @@ import (
 	"sort"
 
 	"github.com/jessevdk/go-flags"
-	// Import sort package for sorting paths
 )
 
 var opts struct {
@@ -60,7 +59,6 @@ func run() error {
 		os.Exit(1)
 	}
 
-	// Sort the list of paths
 	sort.Strings(paths)
 
 	var resultBuffer bytes.Buffer
