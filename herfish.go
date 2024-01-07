@@ -24,7 +24,7 @@ var opts struct {
 	CommitCountMax int    `default:"-1" short:"m" long:"commit-count-max" description:"Filter repositories with commits less than or equal to the specified count"`
 }
 
-const outputTemplate = `{{if .CountCommits}} {{printf "%4d " .CommitCount}}{{end}}{{.Dir}}
+const outputTemplate = `{{if .CountCommits}}{{printf "%4d %s " .CommitCount .RepoStatus}}{{end}}{{.Dir}}
 `
 
 var ErrNoGitLog = errors.New("failed to query git logs")
@@ -33,6 +33,7 @@ type templateData struct {
 	Dir          string
 	CountCommits bool
 	CommitCount  int
+	RepoStatus   string
 }
 
 func Execute() int {
@@ -77,24 +78,41 @@ func run() error {
 
 	sort.Strings(paths)
 
+	slog.Debug("paths", "paths", paths)
+
 	var dataCollection []templateData
-	sentinelDirs := findSentinelDirs(paths, opts.Sentinel)
+	sentinelDirs, err := findSentinelDirs(paths, opts.Sentinel)
+	if err != nil {
+		return fmt.Errorf("failed to find sentinel dirs: %w", err)
+	}
+
+	for _, dir := range sentinelDirs {
+		slog.Debug("found sentinel dir", "dir", dir)
+	}
+
 	for _, dir := range sentinelDirs {
 		data := templateData{
 			Dir:          dir,
 			CountCommits: opts.CommitCountMax != -1,
+			RepoStatus:   "unknown",
 		}
 
 		if opts.CommitCountMax != -1 {
+			slog.Debug("counting commits", "dir", dir)
 			commitCount, err := countCommits(dir)
 			if err == ErrNoGitLog {
 				slog.Error("no log found", "dir", dir)
-				continue
 			} else if err != nil {
 				return fmt.Errorf("failed to count commits: %w", err)
+			} else {
+				data.CommitCount = commitCount
+				slog.Debug("counted commits", "dir", dir, "count", commitCount)
+				status, err := getRepoStatus(dir)
+				if err != nil {
+					return fmt.Errorf("failed to get repo status: %w", err)
+				}
+				data.RepoStatus = status
 			}
-
-			data.CommitCount = commitCount
 		}
 
 		dataCollection = append(dataCollection, data)
@@ -105,6 +123,53 @@ func run() error {
 	outputResults(filteredData)
 
 	return nil
+}
+
+func getRepoStatus(dir string) (string, error) {
+	repo, err := git.PlainOpen(dir)
+	if err != nil {
+		return "", fmt.Errorf("failed to open repo: %w", err)
+	}
+
+	isClean, err := isRepoClean(repo)
+	if err != nil {
+		return "", fmt.Errorf("failed to check repo cleanliness: %w", err)
+	}
+
+	if isClean {
+		return "clean", nil
+	}
+
+	return "dirty", nil
+}
+
+func isRepoClean(repo *git.Repository) (bool, error) {
+	wt, err := repo.Worktree()
+	if err != nil {
+		return false, fmt.Errorf("error getting worktree: %w", err)
+	}
+
+	status, err := wt.Status()
+	if err != nil {
+		return false, fmt.Errorf("error getting status: %w", err)
+	}
+
+	statusCopy := make(map[string]*git.FileStatus, len(status))
+	for k, v := range status {
+		statusCopy[k] = v
+	}
+
+	for file, s := range status {
+		if s.Worktree == git.Untracked {
+			delete(statusCopy, file)
+		}
+	}
+
+	if len(statusCopy) == 0 {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func applyFilters(dataCollection []templateData, commitCountMax int) []templateData {
@@ -140,12 +205,26 @@ func outputResults(filteredData []templateData) {
 	fmt.Print(resultBuffer.String())
 }
 
-func findSentinelDirs(paths []string, sentinelDir string) []string {
+func findSentinelDirs(paths []string, sentinelDir string) ([]string, error) {
 	uniqueDirs := make(map[string]bool)
 	var result []string
 
-	for _, path := range paths {
-		currentDir := filepath.Dir(path)
+	for iter, path := range paths {
+		pathInfo, err := os.Stat(path)
+		if err != nil {
+			return []string{}, fmt.Errorf("failed to stat path: %w", err)
+		}
+
+		currentDir, err := filepath.Abs(path)
+		if err != nil {
+			return []string{}, fmt.Errorf("failed to get absolute path: %w", err)
+		}
+
+		if pathInfo.IsDir() && iter != 0 {
+			currentDir = filepath.Dir(path)
+		}
+
+		slog.Debug("searching for sentinel dir", "path", path, "currentDir", currentDir, "sentinel", sentinelDir)
 
 		for currentDir != "/" && !uniqueDirs[currentDir] {
 			sentinelDir := filepath.Join(currentDir, sentinelDir)
@@ -159,7 +238,7 @@ func findSentinelDirs(paths []string, sentinelDir string) []string {
 		}
 	}
 
-	return result
+	return result, nil
 }
 
 func countCommits(repoPath string) (int, error) {
@@ -179,7 +258,6 @@ func countCommits(repoPath string) (int, error) {
 	count := 0
 	err = iter.ForEach(func(commit *object.Commit) error {
 		count++
-		slog.Debug("found commit", "path", repoPath, "commit", commit.Hash.String())
 		return nil
 	})
 	if err != nil {
