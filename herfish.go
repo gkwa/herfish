@@ -100,20 +100,20 @@ func run() error {
 		dataCollection = append(dataCollection, data)
 	}
 
-	filteredData := applyFilters(dataCollection)
+	filteredData := applyFilters(dataCollection, opts.CommitCountMax)
 
 	outputResults(filteredData)
 
 	return nil
 }
 
-func applyFilters(dataCollection []templateData) []templateData {
+func applyFilters(dataCollection []templateData, commitCountMax int) []templateData {
 	var filteredData []templateData
 
 	for _, data := range dataCollection {
-		if opts.CommitCountMax == -1 {
+		if commitCountMax == -1 {
 			filteredData = append(filteredData, data)
-		} else if data.CommitCount <= opts.CommitCountMax {
+		} else if data.CommitCount <= commitCountMax {
 			filteredData = append(filteredData, data)
 		}
 	}
