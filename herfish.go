@@ -17,11 +17,12 @@ import (
 )
 
 var opts struct {
-	LogFormat    string `long:"log-format" choice:"text" choice:"json" default:"text" description:"Log format"`
-	Verbose      []bool `short:"v" long:"verbose" description:"Show verbose debug information, each -v bumps log level"`
-	logLevel     slog.Level
-	Sentinel     string `short:"s" long:"sentinel" default:".git" description:"Sentinel folder to stop searching"`
-	CountCommits bool   `short:"c" long:"count-commits" description:"Count the number of commits in each Git repository"`
+	LogFormat      string `long:"log-format" choice:"text" choice:"json" default:"text" description:"Log format"`
+	Verbose        []bool `short:"v" long:"verbose" description:"Show verbose debug information, each -v bumps log level"`
+	logLevel       slog.Level
+	Sentinel       string `short:"s" long:"sentinel" default:".git" description:"Sentinel folder to stop searching"`
+	CountCommits   bool   `short:"c" long:"count-commits" description:"Count the number of commits in each Git repository"`
+	CommitCountMax int    `default:"-1" short:"m" long:"commit-count-max" description:"Filter repositories with commits less than or equal to the specified count"`
 }
 
 const outputTemplate = `{{if .CountCommits}} {{printf "%4d " .CommitCount}}{{end}}{{.Dir}}
@@ -66,6 +67,10 @@ func run() error {
 	scanner := bufio.NewScanner(os.Stdin)
 	var paths []string
 
+	if opts.CommitCountMax != -1 && !opts.CountCommits {
+		opts.CountCommits = true
+	}
+
 	for scanner.Scan() {
 		paths = append(paths, scanner.Text())
 	}
@@ -77,7 +82,7 @@ func run() error {
 
 	sort.Strings(paths)
 
-	var resultBuffer bytes.Buffer
+	var dataCollection []templateData
 	sentinelDirs := findSentinelDirs(paths, opts.Sentinel)
 	for _, dir := range sentinelDirs {
 		data := templateData{
@@ -97,20 +102,47 @@ func run() error {
 			data.CommitCount = commitCount
 		}
 
-		tmpl, err := template.New("output").Parse(outputTemplate)
-		if err != nil {
-			return fmt.Errorf("failed to parse template: %w", err)
-		}
+		dataCollection = append(dataCollection, data)
+	}
 
-		err = tmpl.Execute(&resultBuffer, data)
+	filteredData := applyFilters(dataCollection)
+
+	outputResults(filteredData)
+
+	return nil
+}
+
+func applyFilters(dataCollection []templateData) []templateData {
+	var filteredData []templateData
+
+	for _, data := range dataCollection {
+		if opts.CommitCountMax == -1 {
+			filteredData = append(filteredData, data)
+		} else if data.CommitCount <= opts.CommitCountMax {
+			filteredData = append(filteredData, data)
+		}
+	}
+
+	return filteredData
+}
+
+func outputResults(filteredData []templateData) {
+	var resultBuffer bytes.Buffer
+	tmpl, err := template.New("output").Parse(outputTemplate)
+	if err != nil {
+		slog.Error("failed to parse template", "error", err)
+		return
+	}
+
+	for _, data := range filteredData {
+		err := tmpl.Execute(&resultBuffer, data)
 		if err != nil {
-			return fmt.Errorf("failed to execute template: %w", err)
+			slog.Error("failed to execute template", "error", err)
+			continue
 		}
 	}
 
 	fmt.Print(resultBuffer.String())
-
-	return nil
 }
 
 func findSentinelDirs(paths []string, sentinelDir string) []string {
