@@ -3,20 +3,36 @@ package herfish
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
+	"text/template"
 
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/jessevdk/go-flags"
 )
 
 var opts struct {
-	LogFormat string `long:"log-format" choice:"text" choice:"json" default:"text" description:"Log format"`
-	Verbose   []bool `short:"v" long:"verbose" description:"Show verbose debug information, each -v bumps log level"`
-	logLevel  slog.Level
-	Sentinel  string `short:"s" long:"sentinel" default:".git" description:"Sentinel folder to stop searching"`
+	LogFormat    string `long:"log-format" choice:"text" choice:"json" default:"text" description:"Log format"`
+	Verbose      []bool `short:"v" long:"verbose" description:"Show verbose debug information, each -v bumps log level"`
+	logLevel     slog.Level
+	Sentinel     string `short:"s" long:"sentinel" default:".git" description:"Sentinel folder to stop searching"`
+	CountCommits bool   `short:"c" long:"count-commits" description:"Count the number of commits in each Git repository"`
+}
+
+const outputTemplate = `{{if .CountCommits}} {{printf "%4d " .CommitCount}}{{end}}{{.Dir}}
+`
+
+var ErrNoGitLog = errors.New("failed to query git logs")
+
+type templateData struct {
+	Dir          string
+	CountCommits bool
+	CommitCount  int
 }
 
 func Execute() int {
@@ -64,8 +80,30 @@ func run() error {
 	var resultBuffer bytes.Buffer
 	sentinelDirs := findSentinelDirs(paths, opts.Sentinel)
 	for _, dir := range sentinelDirs {
-		resultBuffer.WriteString(dir)
-		resultBuffer.WriteString("\n")
+		data := templateData{
+			Dir:          dir,
+			CountCommits: opts.CountCommits,
+		}
+
+		if opts.CountCommits {
+			commitCount, err := countCommits(dir)
+			if err == ErrNoGitLog {
+				slog.Error("no log found", "dir", dir)
+				continue
+			}
+
+			data.CommitCount = commitCount
+		}
+
+		tmpl, err := template.New("output").Parse(outputTemplate)
+		if err != nil {
+			return fmt.Errorf("failed to parse template: %w", err)
+		}
+
+		err = tmpl.Execute(&resultBuffer, data)
+		if err != nil {
+			return fmt.Errorf("failed to execute template: %w", err)
+		}
 	}
 
 	fmt.Print(resultBuffer.String())
@@ -93,4 +131,27 @@ func findSentinelDirs(paths []string, sentinelDir string) []string {
 	}
 
 	return result
+}
+
+func countCommits(repoPath string) (int, error) {
+	repo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return 0, fmt.Errorf("failed to open repo: %w", err)
+	}
+
+	iter, err := repo.Log(&git.LogOptions{})
+	if err != nil {
+		return 0, ErrNoGitLog
+	}
+
+	count := 0
+	err = iter.ForEach(func(commit *object.Commit) error {
+		count++
+		return nil
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to iterate commits: %w", err)
+	}
+
+	return count, nil
 }
