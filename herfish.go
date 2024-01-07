@@ -21,7 +21,6 @@ var opts struct {
 	Verbose        []bool `short:"v" long:"verbose" description:"Show verbose debug information, each -v bumps log level"`
 	logLevel       slog.Level
 	Sentinel       string `short:"s" long:"sentinel" default:".git" description:"Sentinel folder to stop searching"`
-	CountCommits   bool   `short:"c" long:"count-commits" description:"Count the number of commits in each Git repository"`
 	CommitCountMax int    `default:"-1" short:"m" long:"commit-count-max" description:"Filter repositories with commits less than or equal to the specified count"`
 }
 
@@ -67,10 +66,6 @@ func run() error {
 	scanner := bufio.NewScanner(os.Stdin)
 	var paths []string
 
-	if opts.CommitCountMax != -1 && !opts.CountCommits {
-		opts.CountCommits = true
-	}
-
 	for scanner.Scan() {
 		paths = append(paths, scanner.Text())
 	}
@@ -87,10 +82,10 @@ func run() error {
 	for _, dir := range sentinelDirs {
 		data := templateData{
 			Dir:          dir,
-			CountCommits: opts.CountCommits,
+			CountCommits: opts.CommitCountMax != -1,
 		}
 
-		if opts.CountCommits {
+		if opts.CommitCountMax != -1 {
 			commitCount, err := countCommits(dir)
 			if err == ErrNoGitLog {
 				slog.Error("no log found", "dir", dir)
