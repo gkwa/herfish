@@ -90,6 +90,8 @@ func run() error {
 			if err == ErrNoGitLog {
 				slog.Error("no log found", "dir", dir)
 				continue
+			} else if err != nil {
+				return fmt.Errorf("failed to count commits: %w", err)
 			}
 
 			data.CommitCount = commitCount
@@ -139,17 +141,22 @@ func countCommits(repoPath string) (int, error) {
 		return 0, fmt.Errorf("failed to open repo: %w", err)
 	}
 
+	slog.Debug("counting commits", "repo", repoPath)
+
 	iter, err := repo.Log(&git.LogOptions{})
 	if err != nil {
+		slog.Debug("failed to query git log", "repo", repoPath)
 		return 0, ErrNoGitLog
 	}
 
 	count := 0
 	err = iter.ForEach(func(commit *object.Commit) error {
 		count++
+		slog.Debug("found commit", "path", repoPath, "commit", commit.Hash.String())
 		return nil
 	})
 	if err != nil {
+		slog.Debug("failed to iterate commits", "path", repoPath)
 		return 0, fmt.Errorf("failed to iterate commits: %w", err)
 	}
 
