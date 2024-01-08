@@ -109,7 +109,8 @@ func run() error {
 				slog.Debug("counted commits", "dir", dir, "count", commitCount)
 				status, err := getRepoStatus(dir)
 				if err != nil {
-					return fmt.Errorf("failed to get repo status: %w", err)
+					// print error to stedrr but continue
+					fmt.Fprintln(os.Stderr, fmt.Errorf("failed to get repo status for %s: %w", dir, err))
 				}
 				data.RepoStatus = status
 			}
@@ -131,6 +132,9 @@ func getRepoStatus(dir string) (string, error) {
 		return "", fmt.Errorf("failed to open repo: %w", err)
 	}
 
+	// show debug message about repo cleanliness
+	slog.Debug("checking repo cleanliness", "repo", dir)
+
 	isClean, err := isRepoClean(repo)
 	if err != nil {
 		return "", fmt.Errorf("failed to check repo cleanliness: %w", err)
@@ -144,15 +148,20 @@ func getRepoStatus(dir string) (string, error) {
 }
 
 func isRepoClean(repo *git.Repository) (bool, error) {
+	slog.Debug("checking repo worktree", "repo", repo)
 	wt, err := repo.Worktree()
 	if err != nil {
 		return false, fmt.Errorf("error getting worktree: %w", err)
 	}
 
+	slog.Debug("checking repo status", "repo", repo)
 	status, err := wt.Status()
 	if err != nil {
 		return false, fmt.Errorf("error getting status: %w", err)
 	}
+
+	// show debug message about copy status
+	slog.Debug("checking repo status", "status length", len(status), "status", status)
 
 	statusCopy := make(map[string]*git.FileStatus, len(status))
 	for k, v := range status {
