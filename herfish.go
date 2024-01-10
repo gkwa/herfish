@@ -3,6 +3,7 @@ package herfish
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"text/template"
+	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -147,6 +149,14 @@ func getRepoStatus(dir string) (string, error) {
 	return "dirty", nil
 }
 
+func gitStatusWithTimeout(wt *git.Worktree) (git.Status, error) {
+	status, err := wt.Status()
+	if err != nil {
+		return nil, fmt.Errorf("error getting status: %w", err)
+	}
+	return status, nil
+}
+
 func isRepoClean(repo *git.Repository) (bool, error) {
 	slog.Debug("checking repo worktree", "repo", repo)
 	wt, err := repo.Worktree()
@@ -154,10 +164,31 @@ func isRepoClean(repo *git.Repository) (bool, error) {
 		return false, fmt.Errorf("error getting worktree: %w", err)
 	}
 
-	slog.Debug("checking repo status", "repo", repo)
-	status, err := wt.Status()
-	if err != nil {
-		return false, fmt.Errorf("error getting status: %w", err)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	resultChan := make(chan string, 1)
+
+	var status git.Status
+
+	go func() {
+		status, err = gitStatusWithTimeout(wt)
+		if err != nil {
+			slog.Debug("error getting status", "error", err)
+			resultChan <- "Task failed"
+			return
+		}
+		resultChan <- "Task completed successfully"
+	}()
+
+	// Use select to wait for either the task completion or the context cancellation
+	select {
+	case result := <-resultChan:
+		// Task completed before the context was canceled
+		slog.Debug("get worktree status completed", "result", result)
+	case <-ctx.Done():
+		// Context canceled due to timeout
+		slog.Error("get worktree status canceled due to timeout", "repo", wt.Filesystem.Root())
 	}
 
 	// show debug message about copy status
