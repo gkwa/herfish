@@ -5,7 +5,7 @@ go 1.23.0
 toolchain go1.25.4
 
 require (
-	github.com/go-git/go-git/v5 v5.16.3
+	github.com/go-git/go-git/v5 v5.16.4
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/taylormonacelli/littlecow v0.0.5
 )
